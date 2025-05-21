@@ -6,12 +6,43 @@ const fieldCharacter = '░';
 const pathCharacter = '*';
 
 class Field {
-  constructor(field){
-    this._field = field;
+  constructor(field2dMatrix){
+    this._field = field2dMatrix;
     this._x = 0;
     this._y = 0;
     this._field[this._x][this._y] = '*';
   }
+  
+  static generateField(numRows, numCols, holesPercentage){
+    holesPercentage = holesPercentage>1 ? holesPercentage/100 : holesPercentage; // adjust percentage to 0-1, if not yet
+    if(holesPercentage>1 || holesPercentage<0 || numCols<=0 || numRows<=0) {
+        throw new Error('invalid percentage, number of rows or columns ')
+    }    
+    const totalCells = numCols*numRows;
+    const totalHoles = Math.floor(totalCells * holesPercentage);
+    let array2D = new Array(numRows).fill().map(() => new Array(numCols).fill('░'));
+    array2D[0][0] = '*';
+    let tempArrayOFeatures = new Array(totalHoles+1).fill('O');
+    tempArrayOFeatures[0] = '^';
+    console.table(array2D)
+    console.table(tempArrayOFeatures)
+    let featuresCount = 0;
+    while(featuresCount < totalHoles+1){
+        const randRow = Math.floor(Math.random() * numRows);
+        const randCol = Math.floor(Math.random() * numCols);
+        const randCell = array2D[randRow][randCol];
+        if(randCell === '░'){
+            array2D[randRow][randCol] = tempArrayOFeatures.pop();
+            featuresCount++
+        }
+    }
+
+    return array2D;
+
+
+
+  }
+  
   print(){  // prints each row of the field 2d matrix as a single concatenated string (eg. ░*░O░░░) in a new line
     this._field.forEach(row => {
         let lineStr = "";
@@ -46,7 +77,7 @@ class Field {
     }
     if (this.isHat(newX,newY)) {
         // console.log('Game over. You found the hat! You won!')
-        throw new Error('Game over. You found the hat! You won!');
+        throw new Error('You found the hat! You won!');
     }
     // console.log('path updated');
     
@@ -79,20 +110,51 @@ const myField = new Field([
   ['░', '^', '░'],
 ]);
 
-myField.print();
+// myField.print();
 
-move('down',myField);
-move('down',myField);
-move('right',myField);
+// move('down',myField);
+// move('down',myField);
+// move('right',myField);
 
 
 function move(direction, field){
     try{
         field.updatePath(direction);
-        field.print();
+        // field.print();
         return true;
     } catch(e){
         console.error(e.message);
         return false;
     }
+}
+
+function getDirection(){
+    while(true){    
+        let input = prompt('Which way? ').toLowerCase();
+        switch(input){
+            case 'u':
+                return 'up';
+            case 'd':
+                return 'down';
+            case 'l':
+                return 'left';
+            case 'r':
+                return 'right';
+            default:
+                const error = new Error("Invalid input. Please one of the folowing characters: U (up), D (down), L (left) or R (right)");
+                console.error(error.message);
+        }
+    }
+}
+
+
+const autoField = new Field(Field.generateField(5,10,0.2));
+
+// autoField.print()
+
+let gameOver = false;
+while(!gameOver){
+    autoField.print();
+    let direction = getDirection();
+    gameOver = !move(direction,autoField);
 }
