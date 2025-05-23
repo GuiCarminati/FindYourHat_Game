@@ -1,4 +1,4 @@
-const prompt = require('prompt-sync')({sigint: true});
+const term = require( 'terminal-kit' ).terminal ;
 
 const feature = {
     hat: '^',
@@ -7,10 +7,10 @@ const feature = {
     pathCharacter: '*'
 }
 const direction = {
-    up: 'u',
-    down: 'd',
-    left: 'l',
-    right: 'r'
+    up: 'UP',
+    down: 'DOWN',
+    left: 'LEFT',
+    right: 'RIGHT'
 }
 const validInputs = Object.values(direction);  // ['u', 'd', 'l', 'r']
 
@@ -23,35 +23,66 @@ class Field {
   }
 
   runGame() {
-    let keepPlaying = true;
-    while(keepPlaying){
-        this.print();
-        keepPlaying = this.move(this.getDirection());
+    this.print();
+    term.saveCursor();
+    term.moveTo(1,1);
+
+    term.grabInput();
+
+    term.on( 'key' , this.move.bind(this) ) ;
+ }
+
+  move(key){
+    if(key === 'CTRL_C') process.exit();
+    if(validInputs.includes(key)) {
+        try{
+            this.updatePath(key);
+        } catch(e){
+            term.restoreCursor();
+            console.error(e.message);
+            process.exit();
+        }
     }
   }
 
-  move(dir){
-    try{
-        this.updatePath(dir);
-        return true;
-    } catch(e){
-        console.error(e.message);
-        return false;
+  updatePath(input){
+    let newX = this._x;
+    let newY = this._y;
+    switch (input) {
+        case direction.up:
+            newY--; break;
+        case direction.down:
+            newY++; break;
+        case direction.left:
+            newX--; break;
+        case direction.right:
+            newX++; break; 
     }
+
+    if(this.isOutOfBounds(newX,newY)){
+        term.bgRed(feature.pathCharacter);
+        throw new Error('Game over. You ran out of bounds!');
+    }
+    if(this.isNewPath(newX,newY)){
+        term.moveTo(newX+1,newY+1);
+        if(this.isHole(newX,newY)){
+            term.bgRed(feature.hole);
+            throw new Error('Game over. You fell into a hole!');
+        }
+        
+        if (this.isHat(newX,newY)) {       
+            term.bgGreen(feature.hat);
+            throw new Error('You found the hat! You won!');
+        }
+        term('*').left(1);
+        this._x = newX;
+        this._y = newY;
+        this._field[this._y][this._x] = feature.pathCharacter;
+    }
+
 }
 
-getDirection(){
-    while(true){    
-        let input = prompt('Which way? ').toLowerCase();
 
-        if(validInputs.includes(input)) return input; //
-
-        // continue while input is invalid
-        const error = new Error("Invalid input. Please one of the folowing characters: U (up), D (down), L (left) or R (right)");
-        console.error(error.message); 
-    }
-}
-  
   static generateField(numRows=5, numCols=10, holesPercentage=0.2){
     holesPercentage = holesPercentage>1 ? holesPercentage/100 : holesPercentage; // adjust percentage to 0-1, if not yet
     if(holesPercentage>1 || holesPercentage<0 || numCols<=0 || numRows<=0) {
@@ -80,8 +111,8 @@ getDirection(){
 
 
 
-  }
-  
+}
+
   print(){  // prints each row of the field 2d matrix as a single concatenated string (eg. ░*░O░░░) in a new line
     this._field.forEach(row => {
         let lineStr = "";
@@ -90,41 +121,6 @@ getDirection(){
     }); 
   }
 
-  updatePath(input){
-    let newX = this._x;
-    let newY = this._y;
-    switch (input) {
-        case direction.up:
-            newY--; break;
-        case direction.down:
-            newY++; break;
-        case direction.left:
-            newX--; break;
-        case direction.right:
-            newX++; break; 
-    }
-    // console.log(`newX: ${newX}, newY: ${newY}`);
-    
-    if(this.isOutOfBounds(newX,newY)){
-        // console.log('Game over. You ran out of bounds!');
-        
-        throw new Error('Game over. You ran out of bounds!');
-    }
-    if(this.isHole(newX,newY)){
-        // console.log('Game over. You fell into a hole!');
-        throw new Error('Game over. You fell into a hole!');
-    }
-    if (this.isHat(newX,newY)) {
-        // console.log('Game over. You found the hat! You won!')
-        throw new Error('You found the hat! You won!');
-    }
-    // console.log('path updated');
-    
-    this._x = newX;
-    this._y = newY;
-    this._field[this._y][this._x] = feature.pathCharacter;
-    return true;
-  }
 
   isHole(newX,newY){
     return this._field[newY][newX] === feature.hole;
@@ -132,7 +128,13 @@ getDirection(){
 
   isHat(newX,newY){
     return this._field[newY][newX] === feature.hat;
+  }  
+  isNewPath(newX,newY){
+    return this._field[newY][newX] !== feature.pathCharacter;
   }
+//   isEmptyField(newX,newY){
+//     return this._field[newY][newX] === feature.fieldCharacter;
+//   }
 
   isOutOfBounds(newX, newY){
     const fieldWidth = this._field[0].length;
@@ -143,10 +145,16 @@ getDirection(){
   }
 }
 
-const fieldEasy = new Field(Field.generateField(5,10,0.2));
+
+
+// const fieldEasy = new Field(Field.generateField(5,10,0.2));
 const fieldMedium = new Field(Field.generateField(10,20,0.3));
-const fieldHard = new Field(Field.generateField(25,50,0.4));
+const fieldHard = new Field(Field.generateField(25,50,0.3));
+
 
 // fieldEasy.runGame();
-fieldMedium.runGame();
-// fieldHard.runGame();
+// fieldMedium.runGame();
+fieldHard.runGame();
+
+
+// fieldMedium.runGame();
