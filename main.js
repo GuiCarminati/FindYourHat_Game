@@ -17,15 +17,22 @@ const validInputs = Object.values(direction);  // ['u', 'd', 'l', 'r']
 class Field {
   constructor(field2dMatrix){
     this._field = field2dMatrix;
-    this._x = 0;
-    this._y = 0;
-    this._field[0][0] = feature.pathCharacter; // set starting position
+    let startingX, startingY;
+    // this.print()
+    do{
+        startingX = Math.floor(Math.random() * field2dMatrix[0].length)
+        startingY = Math.floor(Math.random() * field2dMatrix.length)
+    } while(!this.isEmptyField(startingX,startingY));
+    this._x = startingX;
+    this._y = startingY;
+    this._field[this._y][this._x] = feature.pathCharacter; // set random position
   }
 
   runGame() {
     this.print();
     term.saveCursor();
-    term.moveTo(1,1);
+    term.moveTo(this._x+1,this._y+1);
+    term.bgBlue(feature.pathCharacter);
 
     term.grabInput();
 
@@ -91,7 +98,7 @@ class Field {
     const totalCells = numCols*numRows;
     const totalHoles = Math.floor(totalCells * holesPercentage);
     let array2D = new Array(numRows).fill().map(() => new Array(numCols).fill(feature.fieldCharacter));
-    array2D[0][0] = feature.pathCharacter;
+    // array2D[0][0] = feature.pathCharacter;
     let tempArrayOFeatures = new Array(totalHoles+1).fill(feature.hole);
     tempArrayOFeatures[0] = feature.hat;
     // console.table(array2D)
@@ -132,9 +139,17 @@ class Field {
   isNewPath(newX,newY){
     return this._field[newY][newX] !== feature.pathCharacter;
   }
-//   isEmptyField(newX,newY){
-//     return this._field[newY][newX] === feature.fieldCharacter;
-//   }
+  isEmptyField(newX,newY){
+
+    // console.log('newY: '+newY);
+    // console.log('newX: '+newX);
+    // console.table(this._field[newY]);
+    // console.table(this._field[newY][newX]);
+    
+    
+    
+    return this._field[newY][newX] === feature.fieldCharacter;
+  }
 
   isOutOfBounds(newX, newY){
     const fieldWidth = this._field[0].length;
@@ -148,7 +163,7 @@ class Field {
 
 
 // const fieldEasy = new Field(Field.generateField(5,10,0.2));
-const fieldMedium = new Field(Field.generateField(10,20,0.3));
+// const fieldMedium = new Field(Field.generateField(10,20,0.3));
 const fieldHard = new Field(Field.generateField(25,50,0.3));
 
 
