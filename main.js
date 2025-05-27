@@ -1,4 +1,6 @@
-const prompt = require('prompt-sync')({sigint: true});
+const term = require( 'terminal-kit' ).terminal ;
+const solveMaze = require('./modules/mazeSolver.js').solveMaze;
+
 
 const feature = {
     hat: '^',
@@ -7,87 +9,55 @@ const feature = {
     pathCharacter: '*'
 }
 const direction = {
-    up: 'u',
-    down: 'd',
-    left: 'l',
-    right: 'r'
+    up: 'UP',
+    down: 'DOWN',
+    left: 'LEFT',
+    right: 'RIGHT'
 }
 const validInputs = Object.values(direction);  // ['u', 'd', 'l', 'r']
 
 class Field {
   constructor(field2dMatrix){
     this._field = field2dMatrix;
-    this._x = 0;
-    this._y = 0;
-    this._field[0][0] = feature.pathCharacter; // set starting position
+    let startingX, startingY;
+    // this.print()
+    do{
+        startingX = Math.floor(Math.random() * field2dMatrix[0].length)
+        startingY = Math.floor(Math.random() * field2dMatrix.length)
+    } while(!this.isEmptyFieldCharacter(startingX,startingY));
+    this._x = startingX;
+    this._y = startingY;
+    this._field[this._y][this._x] = feature.pathCharacter; // set random position
+    const hatCoords= this.findHat(); // saves Hat position
+    this._xHat = hatCoords[0];
+    this._yHat = hatCoords[1];
   }
 
   runGame() {
-    let keepPlaying = true;
-    while(keepPlaying){
-        this.print();
-        keepPlaying = this.move(this.getDirection());
-    }
-  }
+    this.printAlt();
+    // this.print();
+    term.saveCursor();
+    // term.moveTo(this._xHat+1,this._yHat+1); 
+    // term.bgBrightCyan().black(feature.hat); // highligths hat
+    term.moveTo(this._x+1,this._y+1);
+    // term.bgBlue(feature.pathCharacter).left(1); // highlights starting path character
 
-  move(dir){
-    try{
-        this.updatePath(dir);
-        return true;
-    } catch(e){
-        console.error(e.message);
-        return false;
-    }
-}
+    term.grabInput();
 
-getDirection(){
-    while(true){    
-        let input = prompt('Which way? ').toLowerCase();
+    term.on( 'key' , this.move.bind(this) ) ;
+ }
 
-        if(validInputs.includes(input)) return input; //
-
-        // continue while input is invalid
-        const error = new Error("Invalid input. Please one of the folowing characters: U (up), D (down), L (left) or R (right)");
-        console.error(error.message); 
-    }
-}
-  
-  static generateField(numRows=5, numCols=10, holesPercentage=0.2){
-    holesPercentage = holesPercentage>1 ? holesPercentage/100 : holesPercentage; // adjust percentage to 0-1, if not yet
-    if(holesPercentage>1 || holesPercentage<0 || numCols<=0 || numRows<=0) {
-        throw new Error('invalid percentage, number of rows or columns ')
-    }    
-    const totalCells = numCols*numRows;
-    const totalHoles = Math.floor(totalCells * holesPercentage);
-    let array2D = new Array(numRows).fill().map(() => new Array(numCols).fill(feature.fieldCharacter));
-    array2D[0][0] = feature.pathCharacter;
-    let tempArrayOFeatures = new Array(totalHoles+1).fill(feature.hole);
-    tempArrayOFeatures[0] = feature.hat;
-    // console.table(array2D)
-    // console.table(tempArrayOFeatures)
-    let featuresCount = 0;
-    while(featuresCount < totalHoles+1){ // distribute each feature (holes 'O' and hat '^') randomly accross the field
-        const randRow = Math.floor(Math.random() * numRows);
-        const randCol = Math.floor(Math.random() * numCols);
-        const randCell = array2D[randRow][randCol];
-        if(randCell === feature.fieldCharacter){
-            array2D[randRow][randCol] = tempArrayOFeatures.pop();
-            featuresCount++
+  move(key){
+    if(key === 'CTRL_C') process.exit();
+    if(validInputs.includes(key)) {
+        try{
+            this.updatePath(key);
+        } catch(e){
+            term.restoreCursor();
+            console.error(e.message);
+            process.exit();
         }
     }
-
-    return array2D;
-
-
-
-  }
-  
-  print(){  // prints each row of the field 2d matrix as a single concatenated string (eg. ░*░O░░░) in a new line
-    this._field.forEach(row => {
-        let lineStr = "";
-        row.forEach(el => lineStr+=el);
-        console.log(lineStr)
-    }); 
   }
 
   updatePath(input){
@@ -103,27 +73,145 @@ getDirection(){
         case direction.right:
             newX++; break; 
     }
-    // console.log(`newX: ${newX}, newY: ${newY}`);
-    
+
     if(this.isOutOfBounds(newX,newY)){
-        // console.log('Game over. You ran out of bounds!');
-        
+        term.bgRed(feature.pathCharacter);
         throw new Error('Game over. You ran out of bounds!');
     }
-    if(this.isHole(newX,newY)){
-        // console.log('Game over. You fell into a hole!');
-        throw new Error('Game over. You fell into a hole!');
+    if(this.isNewPath(newX,newY)){
+        term.moveTo(newX+1,newY+1);
+        if(this.isHole(newX,newY)){
+            term.bgRed(feature.hole);
+            throw new Error('Game over. You fell into a hole!');
+        }
+        
+        if (this.isHat(newX,newY)) {       
+            term.bgGreen(feature.hat);
+            throw new Error('You found the hat! You won!');
+        }
+        term('*').left(1);
+        this._x = newX;
+        this._y = newY;
+        this._field[this._y][this._x] = feature.pathCharacter;
     }
-    if (this.isHat(newX,newY)) {
-        // console.log('Game over. You found the hat! You won!')
-        throw new Error('You found the hat! You won!');
+
+  }
+
+
+  static generateField(numRows=5, numCols=10, holesPercentage=0.2){
+    holesPercentage = holesPercentage>1 ? holesPercentage/100 : holesPercentage; // adjust percentage to 0-1, if not yet
+    if(holesPercentage>1 || holesPercentage<0 || numCols<=0 || numRows<=0) {
+        throw new Error('invalid percentage, number of rows or columns ')
+    }    
+    const totalCells = numCols*numRows;
+    const totalHoles = Math.floor(totalCells * holesPercentage);
+    let newField, solveObj, count=0;
+    do{
+      let array2D = new Array(numRows).fill().map(() => new Array(numCols).fill(feature.fieldCharacter));
+      // array2D[0][0] = feature.pathCharacter;
+      let tempArrayOFeatures = new Array(totalHoles+1).fill(feature.hole);
+      tempArrayOFeatures[0] = feature.hat;
+      // console.table(array2D)
+      // console.table(tempArrayOFeatures)
+      let featuresCount = 0;
+      while(featuresCount < totalHoles+1){ // distribute each feature (holes 'O' and hat '^') randomly accross the field
+          const randRow = Math.floor(Math.random() * numRows);
+          const randCol = Math.floor(Math.random() * numCols);
+          const randCell = array2D[randRow][randCol];
+          if(randCell === feature.fieldCharacter){
+              array2D[randRow][randCol] = tempArrayOFeatures.pop();
+              featuresCount++
+          }
+      }
+
+      newField = new Field(array2D);
+
+      // newField.print();
+      solveObj = newField.isSolvable();
+
+      // if(solveObj.solvable) 
+      // newField.printAlt()
+
+      // newField.printAlt(solveObj.correctPath)
+
+      // term.moveTo(0,array2D.length+10);
+      // newField.print();
+
+      // term.move(-newField._field[0].length,2);
+
+      // console.log('is solvable: '+solveObj.solvable);
+      count++;
+    }while(!solveObj.solvable);
+    term.moveTo(0,newField._field.length+2);
+    console.log('generated: '+count)
+    term.moveTo(1,1);
+    return newField;
+  }
+
+  isSolvable(){
+    let boolean2DArray = []; 
+    this._field.forEach((row,i) => {
+      let booleanRow = [];
+      row.forEach((el,j) => {
+        booleanRow.push(el === feature.hole); // fill array wtih false, and true if hole/wall ('O') 
+      });
+      boolean2DArray.push(booleanRow);
+    }); 
+
+    const printSolvePath = (solveArray,path='░',wall='O') => {
+      solveArray.forEach(row => {
+          let lineStr = "";
+          row.forEach(el => {
+              lineStr+=(el ? wall : path)
+          });
+          console.log(lineStr)
+      }); 
     }
-    // console.log('path updated');
-    
-    this._x = newX;
-    this._y = newY;
-    this._field[this._y][this._x] = feature.pathCharacter;
-    return true;
+    // printSolvePath(boolean2DArray)
+
+    return solveMaze(boolean2DArray,this._x,this._y,this._xHat,this._yHat);
+  }
+
+  print(){  // prints each row of the field 2d matrix as a single concatenated string (eg. ░*░O░░░) in a new line
+    this._field.forEach(row => {
+        let lineStr = "";
+        row.forEach(el => lineStr+=el);
+        console.log(lineStr)
+    }); 
+  }
+
+  printAlt(solvedMazed=null){
+    for(let i=0; i<this._field.length; i++){
+      // term.moveTo(0,i)
+      for(let j=0; j<this._field[0].length; j++){
+        const currentChar = this._field[i][j]
+        switch(currentChar){
+          case feature.pathCharacter:
+            term.bgBlue(currentChar); // highligths path character
+            break;
+          case feature.hat:
+            term.bgBrightCyan().black(currentChar); // highligths hat
+            break;
+          default: 
+            if(solvedMazed && solvedMazed[i][j]===true){
+              term.bgBrightBlack(currentChar);
+            } else { term.bgBlack().white(currentChar); }
+            // term(currentChar);
+            
+        }
+        // term(`[${i},${j}]`);
+      }
+
+      term.move(-this._field[0].length,1);
+    }
+  }
+
+  findHat(){
+    for(let y=0; y<this._field.length; y++){
+      for(let x=0; x<this._field[0].length; x++){
+        if(this._field[y][x] === feature.hat) return [x,y];
+      }
+    }
   }
 
   isHole(newX,newY){
@@ -132,6 +220,12 @@ getDirection(){
 
   isHat(newX,newY){
     return this._field[newY][newX] === feature.hat;
+  }  
+  isNewPath(newX,newY){
+    return this._field[newY][newX] !== feature.pathCharacter;
+  }
+  isEmptyFieldCharacter(newX,newY){    
+    return this._field[newY][newX] === feature.fieldCharacter;
   }
 
   isOutOfBounds(newX, newY){
@@ -143,10 +237,15 @@ getDirection(){
   }
 }
 
-const fieldEasy = new Field(Field.generateField(5,10,0.2));
-const fieldMedium = new Field(Field.generateField(10,20,0.3));
-const fieldHard = new Field(Field.generateField(25,50,0.4));
+
+
+// const fieldEasy = Field.generateField(5,10,0.2);
+// const fieldMedium = Field.generateField(10,20,0.3);
+const fieldHard = Field.generateField(25,50,0.4);
 
 // fieldEasy.runGame();
-fieldMedium.runGame();
-// fieldHard.runGame();
+// fieldMedium.runGame();
+fieldHard.runGame();
+
+
+// fieldMedium.runGame();
