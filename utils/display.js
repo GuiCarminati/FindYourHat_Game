@@ -60,6 +60,7 @@ class TerminalManager {
             }
             this.term.move(-field.matrix[0].length,1); // moves to next line
         }
+        this.term.down(5).white('_');
         this.term.moveTo(field.x+1,field.y+1);
     }
 
