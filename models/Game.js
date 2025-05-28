@@ -1,5 +1,6 @@
 const { DIRECTIONS } = require('../config/constants.js');
-const TerminalManager = require('../utils/display.js')
+const TerminalManager = require('../utils/display.js');
+const FieldGenerator = require('../utils/fieldGenerator.js');
 
 const validInputs = Object.values(DIRECTIONS);  // ['UP', 'DOWN', 'LEFT', 'RIGHT']
 
@@ -12,8 +13,9 @@ class Game {
         this.isActive = true;
     }
 
-    run() {
-        this.display.renderField(this.field);
+    run(withSolution=false) {
+        const solution = withSolution ? FieldGenerator.isSolvable(this.field).correctPath : null;
+        this.display.renderField(this.field,solution); // show solution if true, solution=null won't show it
         this.display.grabInput();
         // this.registerCleanup(() => {
         //     this.display.cleanup();
